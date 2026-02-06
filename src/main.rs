@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 use zellij_tile::prelude::*;
 
 #[derive(Default)]
@@ -57,12 +60,12 @@ impl ZellijPlugin for State {
         match action {
             "toggle" => {
                 if let Ok(config) = serde_json::from_str::<ToggleConfig>(&payload) {
-                    self.toggle_pane(&config.name, &config.command);
+                    self.toggle_pane(&config.name, &config.command, config.cwd);
                 }
             }
             "open" => {
                 if let Ok(config) = serde_json::from_str::<ToggleConfig>(&payload) {
-                    self.open_pane(&config.name, &config.command);
+                    self.open_pane(&config.name, &config.command, config.cwd);
                 }
             }
             "close" => {
@@ -144,7 +147,7 @@ impl State {
         }
     }
 
-    fn toggle_pane(&mut self, name: &str, command: &str) {
+    fn toggle_pane(&mut self, name: &str, command: &str, cwd: Option<PathBuf>) {
         eprintln!("toggle_pane: name={}, command={}", name, command);
         if let Some(pane_state) = self.panes.get(name) {
             eprintln!(
@@ -183,10 +186,10 @@ impl State {
         }
         eprintln!("Pane doesn't exist, opening it");
         // Pane doesn't exist, open it
-        self.open_pane(name, command);
+        self.open_pane(name, command, cwd);
     }
 
-    fn open_pane(&mut self, name: &str, command: &str) {
+    fn open_pane(&mut self, name: &str, command: &str, cwd: Option<PathBuf>) {
         // Close all other panes
         for pane in &self.panes {
             if let Some(id) = pane.1.pane_id {
@@ -220,8 +223,8 @@ impl State {
         open_command_pane_floating(
             CommandToRun {
                 path: "zsh".into(),
-                args: vec!["-c".into(), command.into()],
-                cwd: None,
+                args: vec!["-i".into(), "-c".into(), command.into()],
+                cwd,
             },
             coordinates.clone(),
             context,
@@ -260,6 +263,7 @@ impl State {
 struct ToggleConfig {
     name: String,
     command: String,
+    cwd: Option<PathBuf>,
 }
 
 #[derive(serde::Deserialize)]
