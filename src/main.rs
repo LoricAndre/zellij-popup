@@ -104,19 +104,28 @@ impl State {
         // Now match untracked popups to panes
         for (name, pane_state) in self.panes.iter_mut() {
             if pane_state.pane_id.is_none() {
-                // Look for a pane running this command
+                // Look for a pane with matching title or command
                 for (_tab_pos, panes) in &manifest.panes {
                     for pane_info in panes {
                         if pane_info.is_plugin {
                             continue;
                         }
                         let pane_id = pane_info.id;
-                        let pane_command = pane_info.terminal_command.clone().unwrap_or_default();
-                        eprintln!("Checking pane {}: command={:?}", pane_id, pane_command);
-                        // Check if this pane is running our command
-                        if pane_command.contains(&pane_state.command) {
-                            eprintln!("Matched pane {} to popup {}", pane_id, name);
+
+                        // First try matching by title (most reliable)
+                        if pane_info.title == *name {
+                            eprintln!("Matched pane {} to popup {} by title", pane_id, name);
                             pane_state.pane_id = Some(pane_id);
+                            break;
+                        }
+
+                        // Otherwise try matching by command and then set the title
+                        let pane_command = pane_info.terminal_command.clone().unwrap_or_default();
+                        eprintln!("Checking pane {}: title={:?}, command={:?}", pane_id, pane_info.title, pane_command);
+                        if pane_command.contains(&pane_state.command) {
+                            eprintln!("Matched pane {} to popup {} by command, setting title", pane_id, name);
+                            pane_state.pane_id = Some(pane_id);
+                            rename_terminal_pane(pane_id, name);
                             break;
                         }
                     }
@@ -184,6 +193,8 @@ impl State {
                 command: command.to_string(),
             },
         );
+
+        eprintln!("Opened pane for popup {}, will be renamed when tracked", name);
     }
 
     fn close_pane(&mut self, name: &str) {
