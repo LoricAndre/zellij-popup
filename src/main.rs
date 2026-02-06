@@ -122,9 +122,15 @@ impl State {
 
                         // Otherwise try matching by command and then set the title
                         let pane_command = pane_info.terminal_command.clone().unwrap_or_default();
-                        eprintln!("Checking pane {}: title={:?}, command={:?}", pane_id, pane_info.title, pane_command);
+                        eprintln!(
+                            "Checking pane {}: title={:?}, command={:?}",
+                            pane_id, pane_info.title, pane_command
+                        );
                         if pane_command.contains(&pane_state.command) {
-                            eprintln!("Matched pane {} to popup {} by command, setting title", pane_id, name);
+                            eprintln!(
+                                "Matched pane {} to popup {} by command, setting title",
+                                pane_id, name
+                            );
                             pane_state.pane_id = Some(pane_id);
                             rename_terminal_pane(pane_id, name);
                             break;
@@ -141,7 +147,10 @@ impl State {
     fn toggle_pane(&mut self, name: &str, command: &str) {
         eprintln!("toggle_pane: name={}, command={}", name, command);
         if let Some(pane_state) = self.panes.get(name) {
-            eprintln!("Found existing pane state, pane_id={:?}", pane_state.pane_id);
+            eprintln!(
+                "Found existing pane state, pane_id={:?}",
+                pane_state.pane_id
+            );
             if let Some(pane_id) = pane_state.pane_id {
                 // Check if pane is currently visible by looking at manifest
                 if let Some(ref manifest) = self.pane_manifest {
@@ -178,6 +187,12 @@ impl State {
     }
 
     fn open_pane(&mut self, name: &str, command: &str) {
+        // Close all other panes
+        for pane in &self.panes {
+            if let Some(id) = pane.1.pane_id {
+                close_terminal_pane(id);
+            }
+        }
         // Check if pane already exists and is open
         if let Some(pane_state) = self.panes.get(name) {
             if let Some(pane_id) = pane_state.pane_id {
@@ -222,7 +237,10 @@ impl State {
             },
         );
 
-        eprintln!("Opened pane for popup {}, will be renamed when tracked", name);
+        eprintln!(
+            "Opened pane for popup {}, will be renamed when tracked",
+            name
+        );
     }
 
     fn close_pane(&mut self, name: &str) {
