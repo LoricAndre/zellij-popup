@@ -12,6 +12,7 @@ struct State {
 struct PaneState {
     pane_id: Option<u32>,
     command: String,
+    coordinates: Option<FloatingPaneCoordinates>,
 }
 
 register_plugin!(State);
@@ -150,6 +151,14 @@ impl State {
                                 if pane_info.is_suppressed {
                                     eprintln!("Pane is hidden, showing it");
                                     show_pane_with_id(PaneId::Terminal(pane_id), true);
+                                    // Restore the original coordinates
+                                    if let Some(coords) = pane_state.coordinates.clone() {
+                                        eprintln!("Restoring coordinates for pane {}", pane_id);
+                                        change_floating_panes_coordinates(vec![(
+                                            PaneId::Terminal(pane_id),
+                                            coords,
+                                        )]);
+                                    }
                                 } else {
                                     eprintln!("Pane is visible, hiding it");
                                     hide_pane_with_id(PaneId::Terminal(pane_id));
@@ -183,6 +192,15 @@ impl State {
         let mut context = BTreeMap::new();
         context.insert("popup_name".to_string(), name.to_string());
 
+        // Define the floating pane coordinates
+        let coordinates = FloatingPaneCoordinates::new(
+            Some("10%".to_string()),
+            Some("10%".to_string()),
+            Some("80%".to_string()),
+            Some("80%".to_string()),
+            None, // skip_plugin_ids parameter
+        );
+
         // Open a new floating pane
         open_command_pane_floating(
             CommandToRun {
@@ -190,13 +208,7 @@ impl State {
                 args: vec!["-c".into(), command.into()],
                 cwd: None,
             },
-            FloatingPaneCoordinates::new(
-                Some("10%".to_string()),
-                Some("10%".to_string()),
-                Some("80%".to_string()),
-                Some("80%".to_string()),
-                None, // skip_plugin_ids parameter
-            ),
+            coordinates.clone(),
             context,
         );
 
@@ -206,6 +218,7 @@ impl State {
             PaneState {
                 pane_id: None, // Will be updated by PaneUpdate event
                 command: command.to_string(),
+                coordinates,
             },
         );
 
