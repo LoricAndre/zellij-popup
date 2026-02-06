@@ -19,6 +19,16 @@ The compiled plugin will be at `target/wasm32-wasip1/release/zellij-popup.wasm`
 
 ## Installation
 
+### Option 1: Download Pre-built WASM (Recommended)
+
+```bash
+mkdir -p ~/.config/zellij/plugins
+wget https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm \
+  -O ~/.config/zellij/plugins/zellij-popup.wasm
+```
+
+### Option 2: Build from Source
+
 1. Build the plugin (requires Rust and the wasm32-wasip1 target):
    ```bash
    rustup target add wasm32-wasip1
@@ -52,7 +62,7 @@ Add the plugin definition to `~/.config/zellij/config.kdl`:
 ```kdl
 plugins {
     popup {
-        path "~/.config/zellij/plugins/zellij-popup.wasm"
+        path "file:~/.config/zellij/plugins/zellij-popup.wasm"
     }
 }
 ```
@@ -101,7 +111,7 @@ keybinds {
     shared_except "locked" {
         // Toggle htop with Alt-h
         bind "Alt h" {
-            MessagePlugin "popup" {
+            MessagePlugin "file:~/.config/zellij/plugins/zellij-popup.wasm" {
                 name "toggle"
                 payload "{\"name\":\"htop\",\"command\":\"htop\"}"
             }
@@ -109,7 +119,7 @@ keybinds {
 
         // Toggle lazygit with Alt-g
         bind "Alt g" {
-            MessagePlugin "popup" {
+            MessagePlugin "file:~/.config/zellij/plugins/zellij-popup.wasm" {
                 name "toggle"
                 payload "{\"name\":\"git\",\"command\":\"lazygit\"}"
             }
@@ -117,7 +127,7 @@ keybinds {
 
         // Toggle a development server with Alt-s
         bind "Alt s" {
-            MessagePlugin "popup" {
+            MessagePlugin "file:~/.config/zellij/plugins/zellij-popup.wasm" {
                 name "toggle"
                 payload "{\"name\":\"server\",\"command\":\"npm run dev\"}"
             }
