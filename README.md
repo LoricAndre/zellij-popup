@@ -19,7 +19,17 @@ The compiled plugin will be at `target/wasm32-wasip1/release/zellij-popup.wasm`
 
 ## Installation
 
-### Option 1: Download Pre-built WASM (Recommended)
+### Option 1: Use GitHub Release URL (Recommended)
+
+No download needed! Just reference the plugin directly from GitHub in your config:
+
+```kdl
+https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm
+```
+
+See the Configuration section below for examples.
+
+### Option 2: Download Pre-built WASM
 
 ```bash
 mkdir -p ~/.config/zellij/plugins
@@ -27,7 +37,7 @@ wget https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-
   -O ~/.config/zellij/plugins/zellij-popup.wasm
 ```
 
-### Option 2: Build from Source
+### Option 3: Build from Source
 
 1. Build the plugin (requires Rust and the wasm32-wasip1 target):
    ```bash
@@ -57,12 +67,27 @@ cp examples/complete-config.kdl ~/.config/zellij/config.kdl
 
 ### Option 2: Add to Existing Config
 
-Add the plugin definition to `~/.config/zellij/config.kdl`:
+You can define a plugin alias in `~/.config/zellij/config.kdl`:
 
 ```kdl
 plugins {
     popup {
-        path "file:~/.config/zellij/plugins/zellij-popup.wasm"
+        path "https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm"
+    }
+}
+```
+
+Then use the alias in keybindings:
+
+```kdl
+keybinds {
+    shared_except "locked" {
+        bind "Alt h" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"htop\",\"command\":\"htop\"}"
+            }
+        }
     }
 }
 ```
@@ -75,10 +100,12 @@ layout {
 
     // Load the popup plugin (headless - no visible UI)
     pane size=1 borderless=true {
-        plugin location="file:~/.config/zellij/plugins/zellij-popup.wasm"
+        plugin location="https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm"
     }
 }
 ```
+
+**Note:** If you downloaded the plugin locally, use `file:~/.config/zellij/plugins/zellij-popup.wasm` instead.
 
 ## Usage
 
@@ -111,7 +138,7 @@ keybinds {
     shared_except "locked" {
         // Toggle htop with Alt-h
         bind "Alt h" {
-            MessagePlugin "file:~/.config/zellij/plugins/zellij-popup.wasm" {
+            MessagePlugin "https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm" {
                 name "toggle"
                 payload "{\"name\":\"htop\",\"command\":\"htop\"}"
             }
@@ -119,7 +146,7 @@ keybinds {
 
         // Toggle lazygit with Alt-g
         bind "Alt g" {
-            MessagePlugin "file:~/.config/zellij/plugins/zellij-popup.wasm" {
+            MessagePlugin "https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm" {
                 name "toggle"
                 payload "{\"name\":\"git\",\"command\":\"lazygit\"}"
             }
@@ -127,7 +154,7 @@ keybinds {
 
         // Toggle a development server with Alt-s
         bind "Alt s" {
-            MessagePlugin "file:~/.config/zellij/plugins/zellij-popup.wasm" {
+            MessagePlugin "https://github.com/LoricAndre/zellij-popup/releases/latest/download/zellij-popup.wasm" {
                 name "toggle"
                 payload "{\"name\":\"server\",\"command\":\"npm run dev\"}"
             }
@@ -135,6 +162,8 @@ keybinds {
     }
 }
 ```
+
+**Note:** If you downloaded the plugin locally, use `file:~/.config/zellij/plugins/zellij-popup.wasm` instead of the URL.
 
 ## Examples
 
