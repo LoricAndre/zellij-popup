@@ -1,0 +1,9 @@
+// Copy this file to ~/.config/zellij/layouts/popup.kdl
+layout {
+    pane
+
+    // Load the popup plugin (headless - no visible UI)
+    pane size=1 borderless=true {
+        plugin location="file:/home/loric/src/zellij-popup/target/wasm32-wasip1/release/zellij-popup.wasm"
+    }
+}

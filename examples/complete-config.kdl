@@ -1,0 +1,58 @@
+// Complete Zellij configuration with popup plugin
+// Copy to ~/.config/zellij/config.kdl
+// Also copy examples/popup.kdl to ~/.config/zellij/layouts/popup.kdl
+
+// Load the plugin
+plugins {
+    popup {
+        path "~/.config/zellij/plugins/zellij-popup.wasm"
+    }
+}
+
+// Use the popup layout by default (make sure to install examples/popup.kdl to layouts/)
+default_layout "popup"
+
+// Add keybindings
+keybinds {
+    shared_except "locked" {
+        // Toggle htop with Alt-h
+        bind "Alt h" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"htop\",\"command\":\"htop\"}"
+            }
+        }
+
+        // Toggle lazygit with Alt-g
+        bind "Alt g" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"git\",\"command\":\"lazygit\"}"
+            }
+        }
+
+        // Toggle terminal with Alt-t
+        bind "Alt t" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"terminal\",\"command\":\"zsh\"}"
+            }
+        }
+
+        // Toggle server with Alt-s
+        bind "Alt s" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"server\",\"command\":\"npm run dev\"}"
+            }
+        }
+
+        // Toggle logs with Alt-l
+        bind "Alt l" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"logs\",\"command\":\"tail -f /var/log/syslog\"}"
+            }
+        }
+    }
+}

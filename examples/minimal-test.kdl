@@ -1,0 +1,19 @@
+// Minimal config for testing - no default_layout to avoid dependency issues
+// Usage: zellij --config examples/minimal-test.kdl --layout examples/popup.kdl
+
+plugins {
+    popup {
+        path "~/.config/zellij/plugins/zellij-popup.wasm"
+    }
+}
+
+keybinds {
+    shared_except "locked" {
+        bind "Alt h" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"htop\",\"command\":\"htop\"}"
+            }
+        }
+    }
+}

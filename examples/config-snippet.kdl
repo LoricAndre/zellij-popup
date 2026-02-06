@@ -1,0 +1,30 @@
+// Minimal keybindings for the popup plugin
+// Add this to your existing ~/.config/zellij/config.kdl
+
+keybinds {
+    shared_except "locked" {
+        // Toggle htop with Alt-h
+        bind "Alt h" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"htop\",\"command\":\"htop\"}"
+            }
+        }
+
+        // Toggle lazygit with Alt-g
+        bind "Alt g" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"git\",\"command\":\"lazygit\"}"
+            }
+        }
+
+        // Toggle terminal with Alt-t
+        bind "Alt t" {
+            MessagePlugin "popup" {
+                name "toggle"
+                payload "{\"name\":\"terminal\",\"command\":\"zsh\"}"
+            }
+        }
+    }
+}

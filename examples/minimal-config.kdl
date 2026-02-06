@@ -1,0 +1,25 @@
+// Minimal standalone config for testing the popup plugin
+// Usage: zellij --config examples/minimal-config.kdl --layout examples/popup.kdl
+
+plugins {
+    popup {
+        path "file:/home/loric/src/zellij-popup/target/wasm32-wasip1/release/zellij-popup.wasm"
+    }
+}
+
+keybinds {
+    shared_except "locked" {
+        bind "Alt h" {
+            MessagePlugin "file:/home/loric/src/zellij-popup/target/wasm32-wasip1/release/zellij-popup.wasm" {
+                name "toggle"
+                payload "{\"name\":\"htop\",\"command\":\"htop\"}"
+            }
+        }
+        bind "Alt g" {
+            MessagePlugin "file:/home/loric/src/zellij-popup/target/wasm32-wasip1/release/zellij-popup.wasm" {
+                name "toggle"
+                payload "{\"name\":\"git\",\"command\":\"lazygit\"}"
+            }
+        }
+    }
+}
