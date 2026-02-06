@@ -141,11 +141,26 @@ impl State {
         eprintln!("toggle_pane: name={}, command={}", name, command);
         if let Some(pane_state) = self.panes.get(name) {
             eprintln!("Found existing pane state, pane_id={:?}", pane_state.pane_id);
-            if pane_state.pane_id.is_some() {
-                eprintln!("Pane exists, closing it");
-                // Pane exists, close it
-                self.close_pane(name);
-                return;
+            if let Some(pane_id) = pane_state.pane_id {
+                // Check if pane is currently visible by looking at manifest
+                if let Some(ref manifest) = self.pane_manifest {
+                    for (_tab_pos, panes) in &manifest.panes {
+                        for pane_info in panes {
+                            if pane_info.id == pane_id {
+                                if pane_info.is_suppressed {
+                                    eprintln!("Pane is hidden, showing it");
+                                    show_pane_with_id(PaneId::Terminal(pane_id), true);
+                                } else {
+                                    eprintln!("Pane is visible, hiding it");
+                                    hide_pane_with_id(PaneId::Terminal(pane_id));
+                                }
+                                return;
+                            }
+                        }
+                    }
+                }
+                // Pane not found in manifest, might have been closed manually
+                eprintln!("Pane not found in manifest, opening new one");
             }
         }
         eprintln!("Pane doesn't exist, opening it");
@@ -202,6 +217,8 @@ impl State {
             if let Some(pane_id) = pane_state.pane_id {
                 eprintln!("Closing pane {} for popup {}", pane_id, name);
                 close_terminal_pane(pane_id);
+                // Clear the pane_id so it can be reopened later
+                // PaneUpdate will handle cleanup of the tracking
                 pane_state.pane_id = None;
             }
         }
