@@ -1,0 +1,21 @@
+keybinds {
+    shared_except "locked" {
+        bind "Alt b" {
+            MessagePlugin "file:target/wasm32-wasip1/debug/zellij-popup.wasm" {
+                name "toggle"
+                payload "btm"
+                floating false
+            }
+        }
+        bind "Alt g" {
+            MessagePlugin "file:target/wasm32-wasip1/debug/zellij-popup.wasm" {
+                name "toggle"
+                payload "lazygit"
+                floating false
+            }
+        }
+}
+
+load_plugins {
+    "file:target/wasm32-wasip1/debug/zellij-popup.wasm"
+}
