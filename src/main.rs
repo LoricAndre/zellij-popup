@@ -11,10 +11,12 @@ struct PopupEntry {
 
 #[derive(Default)]
 struct State {
-    // Map from command name (e.g. "lazygit") to its managed floating pane state.
-    popups: BTreeMap<String, PopupEntry>,
-    // The name of the currently visible popup, if any.
+    // Map from session name → command name → managed floating pane state.
+    popups: BTreeMap<String, BTreeMap<String, PopupEntry>>,
+    // The name of the currently visible popup in the current session, if any.
     active: Option<String>,
+    // The name of the current session, learned from SessionUpdate events.
+    current_session: Option<String>,
     // Set to true once permissions have been granted.
     ready: bool,
 }
@@ -29,7 +31,11 @@ impl ZellijPlugin for State {
             PermissionType::ReadApplicationState,
             PermissionType::ChangeApplicationState,
         ]);
-        subscribe(&[EventType::PaneUpdate, EventType::PermissionRequestResult]);
+        subscribe(&[
+            EventType::PaneUpdate,
+            EventType::PermissionRequestResult,
+            EventType::SessionUpdate,
+        ]);
     }
 
     fn update(&mut self, event: Event) -> bool {
@@ -39,6 +45,11 @@ impl ZellijPlugin for State {
             }
             Event::PaneUpdate(manifest) => {
                 self.sync_pane_state(&manifest);
+            }
+            Event::SessionUpdate(sessions, _) => {
+                if let Some(current) = sessions.iter().find(|s| s.is_current_session) {
+                    self.current_session = Some(current.name.clone());
+                }
             }
             _ => {}
         }
@@ -86,9 +97,17 @@ fn popup_coords() -> FloatingPaneCoordinates {
 }
 
 impl State {
+    fn session_popups(&mut self) -> &mut BTreeMap<String, PopupEntry> {
+        let session = self.current_session.get_or_insert_with(|| "default".to_string()).clone();
+        self.popups.entry(session).or_default()
+    }
+
     fn toggle_popup(&mut self, command: &str, extra_args: Vec<String>) {
         // Read current state without holding a mutable borrow.
-        let existing = self.popups.get(command).map(|e| (e.pane_id, e.visible));
+        let existing = self
+            .session_popups()
+            .get(command)
+            .map(|e| (e.pane_id, e.visible));
 
         match existing {
             Some((pane_id, true)) => {
@@ -96,7 +115,7 @@ impl State {
                 if pane_id != 0 {
                     hide_pane_with_id(PaneId::Terminal(pane_id));
                 }
-                if let Some(entry) = self.popups.get_mut(command) {
+                if let Some(entry) = self.session_popups().get_mut(command) {
                     entry.visible = false;
                 }
                 self.active = None;
@@ -113,7 +132,7 @@ impl State {
                         popup_coords(),
                     )]);
                 }
-                if let Some(entry) = self.popups.get_mut(command) {
+                if let Some(entry) = self.session_popups().get_mut(command) {
                     entry.visible = true;
                 }
                 self.active = Some(command.to_string());
@@ -124,6 +143,7 @@ impl State {
 
                 let mut cmd = CommandToRun::new(command);
                 cmd.args = extra_args;
+                cmd.cwd = std::env::current_dir().ok();
 
                 // open_command_pane_floating may return the PaneId synchronously.
                 let returned_id =
@@ -136,7 +156,7 @@ impl State {
                     Some(PaneId::Terminal(id)) => id,
                     _ => 0,
                 };
-                self.popups.insert(
+                self.session_popups().insert(
                     command.to_string(),
                     PopupEntry {
                         pane_id,
@@ -150,7 +170,7 @@ impl State {
 
     fn hide_active(&mut self) {
         if let Some(active_name) = self.active.take() {
-            if let Some(entry) = self.popups.get_mut(&active_name) {
+            if let Some(entry) = self.session_popups().get_mut(&active_name) {
                 if entry.visible && entry.pane_id != 0 {
                     hide_pane_with_id(PaneId::Terminal(entry.pane_id));
                     entry.visible = false;
@@ -173,7 +193,7 @@ impl State {
 
         let mut to_remove: Vec<String> = Vec::new();
 
-        for (name, entry) in self.popups.iter_mut() {
+        for (name, entry) in self.session_popups().iter_mut() {
             if entry.pane_id == 0 {
                 // Pending launch: look for a floating command pane whose title
                 // contains the command name (Zellij sets the command as the title).
@@ -195,7 +215,7 @@ impl State {
         }
 
         for name in to_remove {
-            self.popups.remove(&name);
+            self.session_popups().remove(&name);
             if self.active.as_deref() == Some(&name) {
                 self.active = None;
             }
