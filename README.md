@@ -7,7 +7,7 @@ A Zellij plugin that manages long-lived floating panes (lazygit, btm, etc.) with
 The plugin runs silently in the background. You trigger it by sending a `toggle` message to it from a keybind, passing the command to run as the payload. On the first press the pane is created; subsequent presses hide or show it. The pane's process stays alive while hidden.
 
 ```
-first press  → open floating pane (90% of screen, centred)
+first press  → open floating pane (90% of screen, centred) in the focused pane's directory
 second press → hide it (process keeps running)
 third press  → show it again
 ```
