@@ -12,6 +12,8 @@ second press → hide it (process keeps running)
 third press  → show it again
 ```
 
+The popup is looked up in the live pane list by its command line, so the plugin keeps no pane bookkeeping of its own. A popup whose command has exited is replaced by a fresh one on the next press.
+
 If a different popup is already visible when you press a keybind, it is hidden automatically before the new one appears.
 
 ### Why `shared_except "locked"` and `Alt` keys

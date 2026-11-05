@@ -1,22 +1,14 @@
 use zellij_tile::prelude::*;
 
-use std::collections::BTreeMap;
-
-// Each managed popup entry tracks its pane id and whether it is currently visible.
-#[derive(Default, Debug)]
-struct PopupEntry {
-    pane_id: u32,
-    visible: bool,
-}
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Default)]
 struct State {
-    // Map from session name → command name → managed floating pane state.
-    popups: BTreeMap<String, BTreeMap<String, PopupEntry>>,
-    // The name of the currently visible popup in the current session, if any.
-    active: Option<String>,
-    // The name of the current session, learned from SessionUpdate events.
-    current_session: Option<String>,
+    // Latest pane manifest: the single source of truth for which popups exist
+    // and whether they are visible.
+    manifest: Option<PaneManifest>,
+    // Command lines of the popups this plugin spawned.
+    spawned: BTreeSet<String>,
     // Set to true once permissions have been granted.
     ready: bool,
 }
@@ -31,11 +23,7 @@ impl ZellijPlugin for State {
             PermissionType::ReadApplicationState,
             PermissionType::ChangeApplicationState,
         ]);
-        subscribe(&[
-            EventType::PaneUpdate,
-            EventType::PermissionRequestResult,
-            EventType::SessionUpdate,
-        ]);
+        subscribe(&[EventType::PaneUpdate, EventType::PermissionRequestResult]);
     }
 
     fn update(&mut self, event: Event) -> bool {
@@ -44,12 +32,7 @@ impl ZellijPlugin for State {
                 self.ready = true;
             }
             Event::PaneUpdate(manifest) => {
-                self.sync_pane_state(&manifest);
-            }
-            Event::SessionUpdate(sessions, _) => {
-                if let Some(current) = sessions.iter().find(|s| s.is_current_session) {
-                    self.current_session = Some(current.name.clone());
-                }
+                self.manifest = Some(manifest);
             }
             _ => {}
         }
@@ -74,9 +57,8 @@ impl ZellijPlugin for State {
                 None => return false,
             };
 
-            let extra_args: Vec<String> = parts.map(String::from).collect();
-
-            self.toggle_popup(&command, extra_args);
+            let args: Vec<String> = parts.map(String::from).collect();
+            self.toggle_popup(command, args);
         }
 
         false
@@ -97,130 +79,67 @@ fn popup_coords() -> FloatingPaneCoordinates {
 }
 
 impl State {
-    fn session_popups(&mut self) -> &mut BTreeMap<String, PopupEntry> {
-        let session = self.current_session.get_or_insert_with(|| "default".to_string()).clone();
-        self.popups.entry(session).or_default()
+    fn panes(&self) -> Vec<&PaneInfo> {
+        self.manifest
+            .iter()
+            .flat_map(|m| m.panes.values().flatten())
+            .filter(|p| !p.is_plugin)
+            .collect()
     }
 
-    fn toggle_popup(&mut self, command: &str, extra_args: Vec<String>) {
-        // Read current state without holding a mutable borrow.
-        let existing = self
-            .session_popups()
-            .get(command)
-            .map(|e| (e.pane_id, e.visible));
+    fn toggle_popup(&mut self, command: String, args: Vec<String>) {
+        let line = std::iter::once(command.as_str())
+            .chain(args.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let panes = self.panes();
+        let existing = panes
+            .iter()
+            .find(|p| p.terminal_command.as_deref() == Some(line.as_str()))
+            .map(|p| (p.id, p.is_suppressed, p.exited));
+
+        // Visible popups other than the target get hidden first, so only one shows.
+        let others: Vec<u32> = panes
+            .iter()
+            .filter(|p| {
+                p.is_floating
+                    && !p.is_suppressed
+                    && p.terminal_command
+                        .as_ref()
+                        .is_some_and(|c| c != &line && self.spawned.contains(c))
+            })
+            .map(|p| p.id)
+            .collect();
 
         match existing {
-            Some((pane_id, true)) => {
-                // Pane exists and is visible — hide it (toggle off).
-                if pane_id != 0 {
-                    hide_pane_with_id(PaneId::Terminal(pane_id));
+            Some((id, false, false)) => hide_pane_with_id(PaneId::Terminal(id)),
+            Some((id, true, false)) => {
+                for other in others {
+                    hide_pane_with_id(PaneId::Terminal(other));
                 }
-                if let Some(entry) = self.session_popups().get_mut(command) {
-                    entry.visible = false;
-                }
-                self.active = None;
+                show_pane_with_id(PaneId::Terminal(id), true, true);
+                // Zellij resets floating pane size to its default when
+                // suppressed panes are shown.
+                change_floating_panes_coordinates(vec![(PaneId::Terminal(id), popup_coords())]);
             }
-            Some((pane_id, false)) => {
-                // Pane exists but is hidden — hide any other visible popup, then show this one.
-                self.hide_active();
-                if pane_id != 0 {
-                    show_pane_with_id(PaneId::Terminal(pane_id), true, true);
-                    // Restore the original coordinates — Zellij resets floating
-                    // pane size to its default when suppressed panes are shown.
-                    change_floating_panes_coordinates(vec![(
-                        PaneId::Terminal(pane_id),
-                        popup_coords(),
-                    )]);
+            other => {
+                // An exited command pane is replaced rather than re-run in place.
+                if let Some((id, _, true)) = other {
+                    close_pane_with_id(PaneId::Terminal(id));
                 }
-                if let Some(entry) = self.session_popups().get_mut(command) {
-                    entry.visible = true;
+                for other in others {
+                    hide_pane_with_id(PaneId::Terminal(other));
                 }
-                self.active = Some(command.to_string());
-            }
-            None => {
-                // Pane doesn't exist yet — open it as a new floating command pane.
-                self.hide_active();
 
                 let mut cmd = CommandToRun::new(command);
-                cmd.args = extra_args;
+                cmd.args = args;
                 cmd.cwd = get_focused_pane_info()
                     .and_then(|(_, id)| get_pane_cwd(id))
                     .ok()
                     .or_else(|| std::env::current_dir().ok());
-
-                // open_command_pane_floating may return the PaneId synchronously.
-                let returned_id =
-                    open_command_pane_floating(cmd, Some(popup_coords()), BTreeMap::new());
-
-                // Use the returned PaneId if available; otherwise use 0 as a
-                // sentinel and let sync_pane_state() fill it in on the next
-                // PaneUpdate event.
-                let pane_id = match returned_id {
-                    Some(PaneId::Terminal(id)) => id,
-                    _ => 0,
-                };
-                self.session_popups().insert(
-                    command.to_string(),
-                    PopupEntry {
-                        pane_id,
-                        visible: true,
-                    },
-                );
-                self.active = Some(command.to_string());
-            }
-        }
-    }
-
-    fn hide_active(&mut self) {
-        if let Some(active_name) = self.active.take() {
-            if let Some(entry) = self.session_popups().get_mut(&active_name) {
-                if entry.visible && entry.pane_id != 0 {
-                    hide_pane_with_id(PaneId::Terminal(entry.pane_id));
-                    entry.visible = false;
-                }
-            }
-        }
-    }
-
-    /// Reconcile internal state against the pane manifest received from Zellij.
-    ///
-    /// We are the authoritative source for `visible` — we never overwrite it
-    /// from the pane manifest, because PaneUpdate events race with our own
-    /// hide/show calls and would corrupt the toggle state.
-    ///
-    /// This function only does two things:
-    ///   1. Resolve a pending pane id (pane_id == 0) by matching on title.
-    ///   2. Detect panes that have been closed by the user and clean them up.
-    fn sync_pane_state(&mut self, manifest: &PaneManifest) {
-        let all_panes: Vec<&PaneInfo> = manifest.panes.values().flatten().collect();
-
-        let mut to_remove: Vec<String> = Vec::new();
-
-        for (name, entry) in self.session_popups().iter_mut() {
-            if entry.pane_id == 0 {
-                // Pending launch: look for a floating command pane whose title
-                // contains the command name (Zellij sets the command as the title).
-                if let Some(pane) = all_panes.iter().find(|p| {
-                    p.is_floating
-                        && !p.is_plugin
-                        && p.title.to_lowercase().contains(&name.to_lowercase())
-                }) {
-                    entry.pane_id = pane.id;
-                    // Leave entry.visible as-is — we set it when we launched.
-                }
-            } else {
-                // Detect user-closed panes.
-                let still_exists = all_panes.iter().any(|p| p.id == entry.pane_id);
-                if !still_exists {
-                    to_remove.push(name.clone());
-                }
-            }
-        }
-
-        for name in to_remove {
-            self.session_popups().remove(&name);
-            if self.active.as_deref() == Some(&name) {
-                self.active = None;
+                open_command_pane_floating(cmd, Some(popup_coords()), BTreeMap::new());
+                self.spawned.insert(line);
             }
         }
     }
