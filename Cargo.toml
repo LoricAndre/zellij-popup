@@ -5,4 +5,4 @@ authors = ["Aram Drevekenin <aram@poor.dev>"]
 edition = "2018"
 
 [dependencies]
-zellij-tile = "0.44.0"
+zellij-tile = "0.45.1"
