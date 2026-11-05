@@ -143,7 +143,10 @@ impl State {
 
                 let mut cmd = CommandToRun::new(command);
                 cmd.args = extra_args;
-                cmd.cwd = std::env::current_dir().ok();
+                cmd.cwd = get_focused_pane_info()
+                    .and_then(|(_, id)| get_pane_cwd(id))
+                    .ok()
+                    .or_else(|| std::env::current_dir().ok());
 
                 // open_command_pane_floating may return the PaneId synchronously.
                 let returned_id =
