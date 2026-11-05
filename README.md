@@ -22,7 +22,7 @@ Binds in `shared_except "locked"` fire in every input mode, including when a ter
 
 ## Requirements
 
-- [Zellij](https://zellij.dev) ≥ 0.44
+- [Zellij](https://zellij.dev) ≥ 0.45
 - Rust with the `wasm32-wasip1` target
 
 ```sh
